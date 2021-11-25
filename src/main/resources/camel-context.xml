@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:cxf="http://camel.apache.org/schema/cxf"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd        http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd http://camel.apache.org/schema/cxf http://camel.apache.org/schema/cxf/camel-cxf.xsd">
+    <bean class="com.redhat.camel.bean.SyncDb" id="SyncDb"/>
+    <bean class="org.apache.camel.component.servlet.ServletComponent" id="servlet">
+        <property name="servletName" value="camelHttpTransportServlet"/>
+    </bean>
+    <camelContext id="spring-context" xmlns="http://camel.apache.org/schema/spring">
+<!--         <propertyPlaceholder id="properties" location="file:///home/jboss/fusesoa/rdb2b/settings.properties"/> 
+                <propertyPlaceholder id="properties" location="file:///D:/FUSESOA/RDB2B/settings.properties"/>-->
+        <restConfiguration bindingMode="auto" component="servlet" enableCORS="false"/>
+        
+        <rest path="/">
+            <description>访问方式，数据类型，访问路径</description>
+            <post consumes="application/json"
+                produces="application/json" uri="/start">
+                <to uri="direct:rest_start"/>
+            </post>
+        </rest>     
+        
+        <!-- REST触发接口启动 -->
+        <route>
+            <from  uri="direct:rest_start"/>
+            <to  uri="seda:selectdb?waitForTaskToComplete=Never"/>
+            <transform>
+               <simple>${body}</simple>
+            </transform>
+            <!--  <transform>
+               <simple>{"code":"T","msg":"Start sending data"}</simple>
+            </transform>-->
+        </route>
+        <!-- timer触发接口启动 -->
+        <route>
+            <from uri="timer:timerName?period=1000"/>
+            <to uri="seda:selectdb?waitForTaskToComplete=Never"/>
+        </route>
+        <route id="_route_table1_s">
+            <from id="_table1_s_from_1" uri="seda:selectdb?waitForTaskToComplete=Never"/>
+			<log id="_log1" message="Start get db message"/>
+			<process id="_process1" ref="SyncDb">
+                <description>调用自定义BEAN来处理数据</description>
+            </process>
+            <log id="_log1" message="Finish Sync Data"/>
+        </route>
+    </camelContext>
+</beans>
